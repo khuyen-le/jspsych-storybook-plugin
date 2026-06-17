@@ -18,4 +18,4 @@ See [documentation](/plugin-storybook/README.md)
 
 ## Author / Citation
 
-Khuyen Le, Urvi Suwal, Valeria Inojosa,a Aiden Brown, Becky Gilbert, Siying Zhang
+Khuyen Le, Urvi Suwal, Valeria Inojosa, Aiden Brown, Becky Gilbert, Siying Zhang
