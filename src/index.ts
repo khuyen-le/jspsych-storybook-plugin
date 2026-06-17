@@ -1,4 +1,6 @@
 import { JsPsych, JsPsychPlugin, ParameterType, TrialType } from "jspsych";
+import { AudioPlayerInterface } from "./AudioPlayer";
+import autoBind from "auto-bind";
 
 import { version } from "../package.json";
 
@@ -92,31 +94,31 @@ const info = <const>{
         },
 
         /** The x position of the image on the screen in percentage. */
-        x_pos : {
+        x_pos: {
           type: ParameterType.INT,
           default: 0
-        }, 
+        },
 
         /** The y position of the image on the screen in percentage. */
-        y_pos : {
+        y_pos: {
           type: ParameterType.INT,
           default: 0
-        }, 
+        },
 
         /** The width of the image in percentage. */
-        width : {
+        width: {
           type: ParameterType.INT,
           default: null
         },
 
         /** The height of the image in percentage. */
-        height : {
+        height: {
           type: ParameterType.INT,
           default: null
         },
 
         /** The time in milliseconds when the image should appear on the screen. */
-        time_onset : {
+        time_onset: {
           type: ParameterType.INT,
           default: 0
         }, 
@@ -135,6 +137,7 @@ const info = <const>{
     highlight: {
       type: ParameterType.COMPLEX,
       array: true,
+      default: [],
       nested: {
         /** The ID of the image to be highlighted. This must match the ID of one of the images in the images array. */
         image_id: {
@@ -143,16 +146,16 @@ const info = <const>{
         },
 
         /** The time in milliseconds when the image should be highlighted. */
-        time_onset : {
+        time_onset: {
           type: ParameterType.INT,
-          default: 0  
-        }, 
+          default: 0
+        },
 
         /** The time in milliseconds when the image should stop being highlighted. */
-        time_offset : {
+        time_offset: {
           type: ParameterType.INT,
-          default: 0  
-        }, 
+          default: 0
+        },
 
       }
     },
@@ -179,6 +182,7 @@ const info = <const>{
     audio: {
       type: ParameterType.COMPLEX,
       array: true,
+      default: [],
       nested: {
         /** The path of the audio file to be played.  */
         src: {
@@ -187,9 +191,9 @@ const info = <const>{
         },
 
         /** The time in milliseconds when the audio should start playing. */
-        time_onset : {
+        time_onset: {
           type: ParameterType.INT,
-          default: 0  
+          default: 0
         },
 
         /** If true, then responses are allowed while the audio is playing. If false, then the audio must finish playing before the button choices are enabled and a response is accepted. Once the audio has played all the way through, the buttons are enabled and a response is allowed (including while the audio is being re-played via on-screen playback controls). */
@@ -199,9 +203,6 @@ const info = <const>{
         },
       }
     }
-
-
-
   },
   data: {
 
@@ -209,7 +210,7 @@ const info = <const>{
     response: {
       type: ParameterType.OBJECT,
     },
-    
+
     /** The response time in milliseconds for the participant to make a response. The time is measured from when the questions first appear on the screen until the participant's response(s) are submitted. */
     rt: {
       type: ParameterType.INT,
@@ -233,10 +234,51 @@ type Info = typeof info;
  */
 class StorybookPlugin implements JsPsychPlugin<Info> {
   static info = info;
+  private audioPlayers: AudioPlayerInterface[] = [];
+  // the clip currently in front (only one clip is audible at a time)
+  private currentPlayer: AudioPlayerInterface | null = null;
+  private clipsStarted: number = 0;
+  private nClips: number = 0;
+  private trialEnded: boolean = false;
+  private params!: TrialType<Info>;
+  // private display: HTMLElement;
+  private response: { rt: number | null; button: number | null } = { rt: null, button: null };
+  private context: AudioContext | null = null;
+  private startTime: number = 0;
+  private trial_complete!: (trial_data: { rt: number | null; response: number | null }) => void;
 
-  constructor(private jsPsych: JsPsych) {}
+  constructor(private jsPsych: JsPsych) {
+    autoBind(this);
+  }
 
-  trial(display_element: HTMLElement, trial: TrialType<Info>) {
+  async trial(display_element: HTMLElement, trial: TrialType<Info>, on_load: () => void) {
+    
+    // keep a reference to the trial parameters for use in end_trial
+    this.params = trial;
+
+    // set up the audio context
+    this.context = this.jsPsych.pluginAPI.audioContext();
+
+    // load an audio player for every clip declared in the `audio` parameter
+    const clips = trial.audio ?? [];
+    this.nClips = clips.length;
+    this.audioPlayers = await Promise.all(
+      clips.map((clip) => this.jsPsych.pluginAPI.getAudioPlayer(clip.src))
+    );
+
+    // notify when each clip finishes; the closure tells us which clip ended
+    this.audioPlayers.forEach((player) =>
+      player.addEventListener("ended", () => this.handle_audio_ended(player))
+    );
+
+    on_load();
+
+    // start time
+    this.startTime = performance.now();
+    if (this.context !== null) {
+      this.startTime = this.context.currentTime;
+    }
+    
     // // display_element.innerHTML = "<p>This is a placeholder for the storybook plugin. The plugin is still in development, but you can see the progress on the GitHub repository:</p><p><a href='https://github.com/jspsych/plugin-storybook' target='_blank'>https://github.com/jspsych/plugin-storybook</a></p>";
     // const stimulusEvent = document.createElement("div"); 
     // stimulusEvent.id = "jspsych-storybook-stimulus-event";
@@ -271,13 +313,11 @@ class StorybookPlugin implements JsPsychPlugin<Info> {
     let stimulusElement: HTMLCanvasElement;
     let canvas: HTMLCanvasElement;
 
-
     const image = new Image();
     canvas = document.createElement("canvas");
     canvas.style.margin = "0";
     canvas.style.padding = "0";
     stimulusElement = canvas;
-    
 
     const drawImage = () => {
       const [width, height] = calculateImageDimensions(image);
@@ -308,7 +348,7 @@ class StorybookPlugin implements JsPsychPlugin<Info> {
     
     
     // onload event background image
-    // backhround image => start timer image onload 
+    // background image => start timer image onload 
     // image onload
     // for each image in the images array, loop through them, look for any that has a delay (onset time), then set up that time.
     // helper: jspsych.pluginAPI.setTimeout(() => {function that we wanna run is the one that displays the image}, time) to time the presentation of images and audio based on the time_onset parameter for each stimulus in the trial.
@@ -358,14 +398,85 @@ class StorybookPlugin implements JsPsychPlugin<Info> {
     }
      display_element.appendChild(buttonGroupElement);
 
-    // data saving
-    var trial_data = {
-      data1: 99, // Make sure this type and name matches the information for data1 in the data object contained within the info const.
-      data2: "hello world!", // Make sure this type and name matches the information for data2 in the data object contained within the info const.
-    };
-    // end trial
-    // this.jsPsych.finishTrial(trial_data);
+    // start each clip at its scheduled onset (or immediately if time_onset is 0)
+    clips.forEach((clip, i) => {
+      const player = this.audioPlayers[i];
+      if (clip.time_onset > 0) {
+        this.jsPsych.pluginAPI.setTimeout(() => this.start_clip(player), clip.time_onset);
+      } else {
+        this.start_clip(player);
+      }
+    });
+
+    const trial_promise = new Promise((resolve) => {
+      // hold the .resolve() function from the Promise that ends the trial
+      this.trial_complete = resolve;
+    });
+
+    // with no audio there is nothing to wait for, so end immediately
+    if (this.nClips === 0) {
+      this.end_trial();
+    }
+
+    return trial_promise;
   }
+
+  // bring a clip to the front: stop whatever is currently playing so only one
+  // clip is audible at a time, then start the new one
+  private start_clip = (player: AudioPlayerInterface) => {
+    if (this.trialEnded) return;
+
+    const previous = this.currentPlayer;
+    this.currentPlayer = player;
+    this.clipsStarted++;
+
+    if (previous && previous !== player) {
+      // stopping a clip mid-playback (or one that already ended) is safe once
+      // it has been started; guard anyway in case the audio node disagrees
+      try {
+        previous.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+
+    player.play();
+  };
+
+  // called when a clip finishes (either naturally or because it was stopped)
+  private handle_audio_ended = (player: AudioPlayerInterface) => {
+    if (this.trialEnded) return;
+    // ignore clips that ended because a later clip replaced them; only the clip
+    // currently in front matters
+    if (player !== this.currentPlayer) return;
+    // wait until every clip has had its turn to start before ending the trial
+    if (this.clipsStarted < this.nClips) return;
+    this.end_trial();
+  };
+
+  // method to end trial when it is time
+  private end_trial = () => {
+    if (this.trialEnded) return;
+    this.trialEnded = true;
+
+    // stop the clip that is still playing (others have already finished)
+    if (this.currentPlayer) {
+      try {
+        this.currentPlayer.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+
+    // gather the data to store for the trial
+    var trial_data = {
+      rt: this.response.rt,
+      response: this.response.button,
+    };
+
+    // move on to the next trial
+    this.trial_complete(trial_data);
+  };
 }
 
 export default StorybookPlugin;
