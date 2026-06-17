@@ -238,7 +238,7 @@ const info = <const>{
     private nClips: number = 0;
     private trialEnded: boolean = false;
     private params!: TrialType<Info>;
-    // private display: HTMLElement;
+    private display: HTMLElement;
     private response: { rt: number | null; button: number | null } = { rt: null, button: null };
     private context: AudioContext | null = null;
     private startTime: number = 0;
@@ -252,6 +252,9 @@ const info = <const>{
       
       // keep a reference to the trial parameters for use in end_trial
       this.params = trial;
+
+      // reference to display_element for use in private methods
+      this.display = display_element;
       
       // set up the audio context
       this.context = this.jsPsych.pluginAPI.audioContext();
@@ -425,7 +428,38 @@ const info = <const>{
     
     return trial_promise;
   }
-  
+
+  private highlight = () => {
+
+    var img = this.display.querySelector<HTMLImageElement>('#highlight');
+    
+    if (this.params.highlight[0].time_onset > 0) {
+      this.jsPsych.pluginAPI.setTimeout(() => {
+        if (img) {
+          img.style.border = "5px solid green"
+        }
+        if (this.params.highlight[0].time_offset > 0) {
+          this.jsPsych.pluginAPI.setTimeout(() => {
+            if (img) {
+              img.removeAttribute('style')
+            }
+          }, this.params.highlight[0].time_offset);
+        };
+      }, this.params.highlight[0].time_onset);
+    } else {
+      if (this.params.highlight[0].time_offset > 0) {
+        this.jsPsych.pluginAPI.setTimeout(() => {
+          if (img) {
+            img.removeAttribute('style')
+          }
+        }, this.params.highlight[0].time_offset);
+      };
+      if (img) {
+          img.style.border = "5px solid green"
+      }
+    };
+  }
+
   // bring a clip to the front: stop whatever is currently playing so only one
   // clip is audible at a time, then start the new one
   private start_clip = (player: AudioPlayerInterface) => {
