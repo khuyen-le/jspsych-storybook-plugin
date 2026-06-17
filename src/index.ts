@@ -372,13 +372,10 @@ const info = <const>{
     // for each image in the images array, loop through them, look for any that has a delay (onset time), then set up that time.
     // helper: jspsych.pluginAPI.setTimeout(() => {function that we wanna run is the one that displays the image}, time) to time the presentation of images and audio based on the time_onset parameter for each stimulus in the trial.
     // helper: jspsych.pluginAPI.clearAllTimeouts() to clear any timeouts that have been set when the trial ends. 
-<<<<<<< HEAD
 
 
+      console.log("Background image loaded, starting trial timer");
     
-    
-=======
->>>>>>> 74c1714 (update)
     // we want to set up the previous and replay button here
     // and the next button 
     // and we can set it so that they can show it or not (by changing the parameters)
