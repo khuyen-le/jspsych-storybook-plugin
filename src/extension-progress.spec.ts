@@ -1,4 +1,4 @@
-import { startTimeline } from "@jspsych/test-utils";
+import { clickTarget, startTimeline } from "@jspsych/test-utils";
 
 import jsPsychStorybook from "./index";
 import jsPsychExtensionProgress from "./extension-progress";
@@ -10,7 +10,6 @@ const baseTrial = {
   images: [{ id: "bg", src: "img.png" }],
   audio: [],
   highlight: [],
-  animations: [],
 };
 
 describe("extension-progress", () => {
@@ -68,5 +67,58 @@ describe("extension-progress", () => {
 
     const container = jsPsych.getDisplayContainerElement();
     expect(container.querySelector("#storybook-progress-bar")).toBeNull();
+  });
+});
+
+describe("extension-progress across multiple trials", () => {
+  it("clears the previous trial's bar and banner before the next trial starts", async () => {
+    const { jsPsych, displayElement } = await startTimeline(
+      [
+        {
+          ...baseTrial,
+          extensions: [
+            {
+              type: jsPsychExtensionProgress,
+              params: { show_progress_bar: true, total_pages: 2, pages_completed: 2 },
+            },
+          ],
+        },
+        {
+          ...baseTrial,
+          extensions: [{ type: jsPsychExtensionProgress, params: { show_progress_bar: false } }],
+        },
+      ],
+      { extensions: [{ type: jsPsychExtensionProgress }] }
+    );
+
+    const container = jsPsych.getDisplayContainerElement();
+    expect(container.querySelector("#storybook-celebration-banner")).not.toBeNull();
+
+    await clickTarget(displayElement.querySelector("button"));
+
+    expect(container.querySelector("#storybook-progress-bar")).toBeNull();
+    expect(container.querySelector("#storybook-celebration-banner")).toBeNull();
+  });
+
+  it("does not stack a second progress bar on top of the first", async () => {
+    const makeTrial = (pages_completed: number) => ({
+      ...baseTrial,
+      extensions: [
+        {
+          type: jsPsychExtensionProgress,
+          params: { show_progress_bar: true, total_pages: 3, pages_completed },
+        },
+      ],
+    });
+
+    const { jsPsych, displayElement } = await startTimeline([makeTrial(1), makeTrial(2), makeTrial(3)], {
+      extensions: [{ type: jsPsychExtensionProgress }],
+    });
+
+    const container = jsPsych.getDisplayContainerElement();
+    await clickTarget(displayElement.querySelector("button"));
+    await clickTarget(displayElement.querySelector("button"));
+
+    expect(container.querySelectorAll("#storybook-progress-bar").length).toBe(1);
   });
 });

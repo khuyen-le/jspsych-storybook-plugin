@@ -1,4 +1,4 @@
-import { startTimeline } from "@jspsych/test-utils";
+import { clickTarget, startTimeline } from "@jspsych/test-utils";
 
 import jsPsychStorybook from "./index";
 import jsPsychExtensionAnimations from "./extension-animations";
@@ -143,5 +143,31 @@ describe("extension-animations (canvas mode)", () => {
     transform = extension.getImageTransform("bunny");
     expect(transform.rotate).toBe(0);
     expect(transform.translateY).not.toBe(0);
+  });
+});
+
+describe("extension-animations across multiple trials", () => {
+  it("resets animation state between trials, even if the prior trial's animation never finished", async () => {
+    const { jsPsych, displayElement } = await run([
+      withAnimations([{ image_id: "bunny", type: "wiggle", duration: 5000, time_onset: 0 }], "canvas"),
+      withAnimations([], "canvas"),
+    ]);
+
+    const extension = jsPsych.extensions["storybook-animations"] as InstanceType<
+      typeof jsPsychExtensionAnimations
+    >;
+
+    jest.advanceTimersByTime(200); // trial 1's wiggle is mid-flight, nowhere near its 5000ms duration
+    expect(extension.getImageTransform("bunny").rotate).not.toBe(0);
+
+    await clickTarget(displayElement.querySelector("button"));
+
+    expect(extension.getImageTransform("bunny")).toEqual({
+      rotate: 0,
+      scale: 1,
+      translateX: 0,
+      translateY: 0,
+      opacity: 1,
+    });
   });
 });
