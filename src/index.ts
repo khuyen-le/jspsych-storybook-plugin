@@ -118,9 +118,7 @@ const info = <const>{
           default: true,
         },
       }
-    }
-
-
+    },
 
   },
   data: {
@@ -148,7 +146,7 @@ type Info = typeof info;
  *
  * Animated storybook with audio
  *
- * @author Khuyen Le, Urvi Suwal, Valeria Inojosa,a Aiden Brown, Becky Gilbert, Siying Zhang
+ * @author Khuyen Le, Urvi Suwal, Valeria Inojosa, Aiden Brown, Becky Gilbert, Siying Zhang
  * @see {@link /plugin-storybook/README.md}}
  */
 class StorybookPlugin implements JsPsychPlugin<Info> {
@@ -156,14 +154,77 @@ class StorybookPlugin implements JsPsychPlugin<Info> {
 
   constructor(private jsPsych: JsPsych) {}
 
+  private renderImages(display_element: HTMLElement, trial: TrialType<Info>): Record<string, HTMLImageElement> {
+    const imageElements: Record<string, HTMLImageElement> = {};
+    for (const img of trial.images ?? []) {
+      const el = document.createElement('img');
+      el.src = img.src;
+      el.dataset.imageId = img.id;
+      el.style.cssText = `
+        position: absolute;
+        left: ${img.x_pos}%;
+        top: ${img.y_pos}%;
+        width: ${img.width}%;
+        height: ${img.height}%;
+        object-fit: contain;
+        ${img.time_onset > 0 ? 'opacity: 0; pointer-events: none;' : ''}
+        ${img.clickable ? 'cursor: pointer;' : ''}
+      `;
+      if (img.clickable) {
+        el.addEventListener('click', () => {
+          this.jsPsych.pluginAPI.clearAllTimeouts();
+          display_element.innerHTML = '';
+          this.jsPsych.finishTrial({ response: img.id, rt: 0 });
+        });
+      }
+      display_element.appendChild(el);
+      imageElements[img.id] = el;
+
+      if (img.time_onset > 0) {
+        this.jsPsych.pluginAPI.setTimeout(() => {
+          el.style.opacity = '1';
+          el.style.pointerEvents = '';
+        }, img.time_onset);
+      }
+      if (img.time_offset > 0) {
+        this.jsPsych.pluginAPI.setTimeout(() => {
+          el.style.opacity = '0';
+          el.style.pointerEvents = 'none';
+        }, img.time_offset);
+      }
+    }
+    return imageElements;
+  }
+
   trial(display_element: HTMLElement, trial: TrialType<Info>) {
-    // data saving
-    var trial_data = {
-      data1: 99, // Make sure this type and name matches the information for data1 in the data object contained within the info const.
-      data2: "hello world!", // Make sure this type and name matches the information for data2 in the data object contained within the info const.
-    };
-    // end trial
-    this.jsPsych.finishTrial(trial_data);
+    this.renderImages(display_element, trial);
+
+    // Audio playback
+    for (const aud of trial.audio ?? []) {
+      const play = () => {
+        this.jsPsych.pluginAPI.getAudioPlayer(aud.src).then(player => player.play());
+      };
+      if (aud.time_onset > 0) {
+        this.jsPsych.pluginAPI.setTimeout(play, aud.time_onset);
+      } else {
+        play();
+      }
+    }
+
+    const btn = document.createElement('button');
+    btn.textContent = 'Continue →';
+    btn.style.cssText = `
+      position: fixed; bottom: 24px; right: 24px;
+      padding: 12px 28px; font-size: 16px; font-family: sans-serif;
+      background: #5865F2; color: white; border: none; border-radius: 8px;
+      cursor: pointer; z-index: 1000;
+    `;
+    btn.addEventListener('click', () => {
+      this.jsPsych.pluginAPI.clearAllTimeouts();
+      display_element.innerHTML = '';
+      this.jsPsych.finishTrial({ response: 'continue', rt: 0 });
+    });
+    display_element.appendChild(btn);
   }
 }
 
