@@ -164,7 +164,7 @@ const info = <const>{
       audio: {
         type: ParameterType.COMPLEX,
         array: true,
-        default: [],
+        default: [{src: 'sound/chimes.mp3', time_onset: 1000}],
         nested: {
           /** The path of the audio file to be played.  */
           src: {
