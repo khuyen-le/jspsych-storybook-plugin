@@ -51,6 +51,7 @@ const info = <const>{
     images: {
       type: ParameterType.COMPLEX,
       array: true,
+      default: [],
       nested: {
         /** unique ID for this image. This must not have any spaces or special characters. */
         id: {
@@ -112,11 +113,17 @@ const info = <const>{
     highlight: {
       type: ParameterType.COMPLEX,
       array: true,
+      default: [],
       nested: {
         /** The ID of the image to be highlighted. This must match the ID of one of the images in the images array. */
         image_id: {
           type: ParameterType.STRING,
           default: undefined,
+        },
+
+        style: {
+          type: ParameterType.STRING,
+          default: '5px solid green'
         },
         
         /** The time in milliseconds when the image should be highlighted. */
@@ -126,16 +133,16 @@ const info = <const>{
         }, 
         
         /** The time in milliseconds when the image should stop being highlighted. */
-        time_offset : {
+        duration : {
           type: ParameterType.INT,
           default: 0  
         }, 
-        
       }
     },
     
     animations: {
       type: ParameterType.COMPLEX,
+      default: [],
       array: true,
       nested: {
         /** The ID of the image to be animated. This must match the ID of one of the images in the images array. */
@@ -215,7 +222,7 @@ const info = <const>{
     private nClips: number = 0;
     private trialEnded: boolean = false;
     private params!: TrialType<Info>;
-    // private display: HTMLElement;
+    private display: HTMLElement;
     private response: { rt: number | null; button: number | null } = { rt: null, button: null };
     private context: AudioContext | null = null;
     private startTime: number = 0;
@@ -229,6 +236,9 @@ const info = <const>{
       
       // keep a reference to the trial parameters for use in end_trial
       this.params = trial;
+
+      // reference to display_element for use in private methods
+      this.display = display_element;
       
       // set up the audio context
       this.context = this.jsPsych.pluginAPI.audioContext();
@@ -252,7 +262,7 @@ const info = <const>{
     if (this.context !== null) {
       this.startTime = this.context.currentTime;
     }
-    
+     
     display_element.innerHTML = "";
 
     const containerDiv = document.createElement("div");
@@ -305,18 +315,7 @@ const info = <const>{
 
     display_element.appendChild(containerDiv);
 
-    if (trial.end_trial_button.button_visible) {
-      const endButton = document.createElement("button");
-      endButton.id = "jspsych-storybook-end-trial-button";
-      endButton.className = "jspsych-btn";
-      endButton.textContent = trial.end_trial_button.button_text;
-      endButton.style.position = "fixed";
-      endButton.style.bottom = "24px";
-      endButton.style.right = "24px";
-      endButton.addEventListener("click", () => this.end_trial());
-      display_element.appendChild(endButton);
-    }
-
+    
     // overlay images — positioned as % of containerDiv so they scale with it
     for (const image of trial.images) {
       const img = document.createElement("img");
@@ -343,6 +342,8 @@ const info = <const>{
       }
 
     }
+    //set up highlighting
+    this.highlight();   
 
     // start each clip at its scheduled onset (or immediately if time_onset is 0)
     clips.forEach((clip, i) => {
@@ -371,7 +372,36 @@ const info = <const>{
     
     return trial_promise;
   }
-  
+
+  private highlight = () => {
+    this.params.highlight?.map((obj) => {
+      const applyHighlight = () => {
+        const img = this.display.querySelector<HTMLImageElement>(
+          `#jspsych-storybook-image-${obj.image_id}`
+        );
+
+        if (!img) {
+          return;
+        }
+
+        img.style.outline = obj.style;
+
+        if (obj.duration > 0) {
+          this.jsPsych.pluginAPI.setTimeout(() => {
+            img.style.outline = null
+          }, obj.duration);
+        }
+      };
+
+      if (obj.time_onset > 0) {
+        this.jsPsych.pluginAPI.setTimeout(applyHighlight, obj.time_onset);
+      } else {
+        // still defer to give the image a chance to land in the DOM
+        this.jsPsych.pluginAPI.setTimeout(applyHighlight, 0);
+      }
+    });
+  };
+
   // bring a clip to the front: stop whatever is currently playing so only one
   // clip is audible at a time, then start the new one
   private start_clip = (player: AudioPlayerInterface) => {
