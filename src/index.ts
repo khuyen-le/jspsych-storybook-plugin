@@ -159,11 +159,6 @@ const info = <const>{
     },
     data: {
       
-      /** An object containing the response for each question. The object will have a separate key (variable) for each question, with the first question in the trial being recorded in `Q0`, the second in `Q1`, and so on. The responses are recorded as integers, representing the position selected on the likert scale for that question. If the `name` parameter is defined for the question, then the response object will use the value of `name` as the key for each question. This will be encoded as a JSON string when data is saved using the `.json()` or `.csv()` functions. */
-      response: {
-        type: ParameterType.OBJECT,
-      },
-      
       /** The response time in milliseconds for the participant to make a response. The time is measured from when the questions first appear on the screen until the participant's response(s) are submitted. */
       rt: {
         type: ParameterType.INT,
@@ -199,7 +194,7 @@ const info = <const>{
     private response: { rt: number | null; button: number | null } = { rt: null, button: null };
     private context: AudioContext | null = null;
     private startTime: number = 0;
-    private trial_complete!: (trial_data: { rt: number | null; response: number | null }) => void;
+    private trial_complete!: (trial_data: Record<string, unknown>) => void;
     
     constructor(private jsPsych: JsPsych) {
       autoBind(this);
@@ -229,9 +224,6 @@ const info = <const>{
     
     // start time
     this.startTime = performance.now();
-    if (this.context !== null) {
-      this.startTime = this.context.currentTime;
-    }
     
     display_element.innerHTML = "";
 
@@ -383,9 +375,10 @@ const info = <const>{
     }
     
     // gather the data to store for the trial
-    var trial_data = {
-      rt: this.response.rt,
-      response: this.response.button,
+    const trial_data = {
+      rt: Math.round(performance.now() - this.startTime),
+      // response: this.response.button,
+      ... this.params, 
     };
     
     // move on to the next trial
