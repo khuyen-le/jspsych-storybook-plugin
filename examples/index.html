@@ -28,6 +28,10 @@
       choices: ["Start"],
     };
 
+    const default_trial = {
+      type: jsPsychStorybook,
+    };
+
     // The storybook trial plays each clip in the `audio` array at its
     // `time_onset` (ms). The trial ends after the last clip finishes.
 
@@ -119,9 +123,38 @@
       ],
     };
     
+    const trial2 = {
+      type: jsPsychStorybook,
+      background_image: "img/background.jpeg",
+      images: [{ 
+        id: "arlo", 
+        src: "img/arlo.png", 
+        x_pos: 20, 
+        y_pos: 20, 
+        width: 20, 
+        time_onset: 0, 
+        duration: 5000 
+      },{ 
+        id: "arlo-hi", 
+        src: "img/arlo-hi.png", 
+        x_pos: 20, 
+        y_pos: 20, 
+        width: 20, 
+        time_onset: 5000, 
+        duration: 2000 
+      }],
+      width: 70, 
+      highlight: [{
+          image_id: "arlo",
+          time_onset: 1000,
+          duration: 3000
+        }], 
+      audio: [
+        { src: "sound/chimes.mp3", time_onset: 0 },
+        { src: "sound/arlo-hi.mp3", time_onset: 6015 },
+      ],
+    }
 
-    
-
-    jsPsych.run([start, readytogo, arlo, sarah, mom, dad]);
+    jsPsych.run([start, default_trial, trial2, readytogo, arlo, sarah, mom, dad]);
   </script>
 </html>

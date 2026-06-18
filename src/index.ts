@@ -51,6 +51,7 @@ const info = <const>{
     images: {
       type: ParameterType.COMPLEX,
       array: true,
+      default: [{id: '', src: '', duration: 1000}],
       nested: {
         /** unique ID for this image. This must not have any spaces or special characters. */
         id: {
@@ -112,11 +113,17 @@ const info = <const>{
     highlight: {
       type: ParameterType.COMPLEX,
       array: true,
+      default: [],
       nested: {
         /** The ID of the image to be highlighted. This must match the ID of one of the images in the images array. */
         image_id: {
           type: ParameterType.STRING,
           default: undefined,
+        },
+
+        style: {
+          type: ParameterType.STRING,
+          default: '5px solid green'
         },
         
         /** The time in milliseconds when the image should be highlighted. */
@@ -126,7 +133,7 @@ const info = <const>{
         }, 
         
         /** The time in milliseconds when the image should stop being highlighted. */
-        time_offset : {
+        duration: {
           type: ParameterType.INT,
           default: 0  
         }, 
@@ -137,6 +144,7 @@ const info = <const>{
     animations: {
       type: ParameterType.COMPLEX,
       array: true,
+      default: [],
       nested: {
         /** The ID of the image to be animated. This must match the ID of one of the images in the images array. */
         image_id: {
@@ -225,6 +233,8 @@ const info = <const>{
       
       // keep a reference to the trial parameters for use in end_trial
       this.params = trial;
+
+      this.display = display_element
       
       // set up the audio context
       this.context = this.jsPsych.pluginAPI.audioContext();
