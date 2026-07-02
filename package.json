@@ -19,6 +19,7 @@
     "test": "jest",
     "test:watch": "npm test -- --watch",
     "tsc": "tsc",
+    "prepare": "npm run build", 
     "build": "rollup --config",
     "build:watch": "npm run build -- --watch"
   },
